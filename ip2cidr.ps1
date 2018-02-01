@@ -1,6 +1,11 @@
-function ip2long($ip){
-    $ip = [System.Net.IPAddress]::Parse($ip)
-    return ([uint32]($ip.GetAddressBytes()[0]) -shl 24) + ([uint32]($ip.GetAddressBytes()[1]) -shl 16) + ([uint32]($ip.GetAddressBytes()[2]) -shl 8) + ([uint32]($ip.GetAddressBytes()[3]))
+function long2ip([int64]$ipAddress)
+{
+    return "$([BitConverter]::GetBytes($ipAddress)[3]).$([BitConverter]::GetBytes($ipAddress)[2]).$([BitConverter]::GetBytes($ipAddress)[1]).$([BitConverter]::GetBytes($ipAddress)[0])"
+}
+
+function ip2long([string]$ip){
+    $ipaddress = [System.Net.IPAddress]::Parse($ip)
+    return (([int64]$ipaddress.GetAddressBytes()[0]) -shl 24) + (([int64]$ipaddress.GetAddressBytes()[1]) -shl 16) + (([int64]$ipaddress.GetAddressBytes()[2]) -shl 8) + (([int64]$ipaddress.GetAddressBytes()[3]))
 }
 
 # method CIDRtoMask
@@ -20,9 +25,9 @@ function CIDRtoMask {
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
         [Int]
         [ValidateRange(0,32)]
-        $Mask
+        $int
     )
-    return [System.Net.IPAddress]::Parse(([uint32]::MaxValue -shl (32 - $Mask))).ToString();
+    return long2ip(-1 -shl (32 - $int));
 }
 
 # method countSetBits.
@@ -36,7 +41,7 @@ function CIDRtoMask {
 # @static
 # @see http://stackoverflow.com/questions/109023/best-algorithm-to-count-the-number-of-set-bits-in-a-32-bit-integer
 # @return int number of bits set.
-function countSetbits([uint32]$int){
+function countSetbits([int64]$int){
     $count = 0;
 
     while ($int -ne 0) {
@@ -124,12 +129,12 @@ function IPisWithinCIDR($ipinput,$cidr){
     return $(($ip1 -le $ipinput) -and ($ipinput -le $ip2));
 }
 
-* method maxBlock.
-* Determines the largest CIDR block that an IP address will fit into.
-* Used to develop a list of CIDR blocks.
-* Usage:
-*     maxBlock("127.0.0.1");
-*     maxBlock("127.0.0.0");
+# method maxBlock.
+# Determines the largest CIDR block that an IP address will fit into.
+# Used to develop a list of CIDR blocks.
+# Usage:
+#     maxBlock("127.0.0.1");
+#     maxBlock("127.0.0.0");
 # Result:
 #     int(32)
 #     int(8)
