@@ -101,7 +101,7 @@ function maskToCIDR($netmask){
 # @static
 # @return String CIDR block.
 function alignedCIDR($ipinput,$netmask){
-    $alignedIP = [System.Net.IPAddress]::Parse((ip2long($ipinput)) -band (ip2long($netmask)));
+    $alignedIP = ip2long((ip2long($ipinput)) -band (ip2long($netmask)));
     return "$alignedIP/$(maskToCIDR($netmask))";
 }
 
@@ -152,7 +152,7 @@ function maxBlock($ipinput) {
 # Returns an array of CIDR blocks that fit into a specified range of
 # ip addresses.
 # Usage:
-#    rangeToCIDRList("127.0.0.1","127.0.0.34");
+#     rangeToCIDRList("127.0.0.1","127.0.0.34");
 # Result:
 #     "127.0.0.1/32"
 #     "127.0.0.2/31"
@@ -167,10 +167,8 @@ function maxBlock($ipinput) {
 # @return Array CIDR blocks in a numbered array.
 function rangeToCIDRList($ipStart, $ipEnd)
 {
-    $start = [System.Net.IPAddress]::Parse($ipStart)
-    $start = ([uint32]($start.GetAddressBytes()[0]) -shl 24) + ([uint32]($start.GetAddressBytes()[1]) -shl 16) + ([uint32]($start.GetAddressBytes()[2]) -shl 8) + ([uint32]($start.GetAddressBytes()[3]))
-    $end = [System.Net.IPAddress]::Parse($ipEnd)
-    $end = ([uint32]($end.GetAddressBytes()[0]) -shl 24) + ([uint32]($end.GetAddressBytes()[1]) -shl 16) + ([uint32]($end.GetAddressBytes()[2]) -shl 8) + ([uint32]($end.GetAddressBytes()[3]))
+    $start = ip2long($ipStart)
+    $end = ip2long($ipEnd)
     $result = @();
  
     while ($end -ge $start)
@@ -186,7 +184,7 @@ function rangeToCIDRList($ipStart, $ipEnd)
         }
         [byte]$maxDiff = [byte](32 - [System.Math]::Floor([System.Math]::Log($end - $start + 1) / [System.Math]::Log(2)));
         if ($maxSize -lt $maxDiff){$maxSize = $maxDiff}
-        $result += [System.Net.IPAddress]::Parse($start).ToString() + "/" + $maxSize;
+        $result += long2ip($start) + "/" + $maxSize;
         $start += [int64][System.Math]::Pow(2, (32 - $maxSize));
     }
     return $result;
@@ -199,10 +197,8 @@ function rangeToCIDRList($ipStart, $ipEnd)
 # Usage:
 #     cidrToRange("127.0.0.128/25");
 # Result:
-#     array(2) {
-#   *       [0]=> string(11) "127.0.0.128"
-#   *       [1]=> string(11) "127.0.0.255"
-#   *     }
+#     "127.0.0.128"
+#     "127.0.0.255"
 # @param $cidr string CIDR block
 # @return Array low end of range then high end of range.
 function cidrToRange {
@@ -214,7 +210,30 @@ function cidrToRange {
     )
     $range = @()
     $cidra = $cidr.Split("/")
-    $range += [System.Net.IPAddress]::Parse(((ip2long($cidra[0])) -band (([uint32]::MaxValue -shl (32 - $cidra[1]))))).ToString();
-    $range += [System.Net.IPAddress]::Parse(((ip2long($cidra[0])) + [System.Math]::Pow(2, (32 - $cidra[1])) - 1)).ToString();
+    $range += long2ip((ip2long($cidra[0])) -band (-1 -shl (32 - $cidra[1])));
+    $range += long2ip((ip2long($cidra[0])) + [System.Math]::Pow(2, (32 - $cidra[1])) - 1);
     return $range;
+}
+
+# method cidrDevider.
+# Returns an array of splited IPv4 networks.
+# Usage:
+#     cidrDevider("127.0.0.0/23", 24);
+# Result:
+#     "127.0.0.0/24"
+#     "127.0.1.0/24"
+# @param $cidr string CIDR block
+# @param $dstprefix int result prefix
+# @return Array of splited networks.
+function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
+	$range = cidrToRange($cidr);
+	$result = @();
+	if ($dstprefix -lt $($cidr.Split("/")[1])){throw "Invalid Destination Prefix"};
+	$incr = [System.Math]::Pow(2, (32 - $dstprefix))
+	$net = ip2long($range[0]);
+	Do {
+		$result += "$(long2ip($net))/$dstprefix";
+		$net = $net + $incr;
+	} While ($net -le $(ip2long($range[1])));
+	return $result
 }
