@@ -237,3 +237,31 @@ function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
 	} While ($net -le $(ip2long($range[1])));
 	return $result
 }
+
+# method resolveASN.
+# Returns an ASN number from IPv4 network/address.
+# Usage:
+#     resolveASN("8.8.8.0/24");
+# Result:
+#     "15169"
+# @param $cidr string CIDR block or IPv4 Address
+# @return ASN int.
+function resolveASN($cidr){
+    $apilink = "https://api.iptoasn.com/v1/as/ip/"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    return $(ConvertFrom-Json($(Invoke-WebRequest $($apilink + $cidr)).Content)).as_number;
+}
+
+# method resolveCountry.
+# Returns an Country Code from IPv4 network/address.
+# Usage:
+#     resolveASN("8.8.8.0/24");
+# Result:
+#     "US"
+# @param $cidr string CIDR block or IPv4 Address
+# @return US as string.
+function resolveCountry($cidr){
+    $apilink = "https://api.iptoasn.com/v1/as/ip/"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    return $(ConvertFrom-Json($(Invoke-WebRequest $($apilink + $cidr)).Content)).as_country_code;
+}
