@@ -184,7 +184,7 @@ function rangeToCIDRList($ipStart, $ipEnd)
         }
         [byte]$maxDiff = [byte](32 - [System.Math]::Floor([System.Math]::Log($end - $start + 1) / [System.Math]::Log(2)));
         if ($maxSize -lt $maxDiff){$maxSize = $maxDiff}
-        $result += long2ip($start) + "/" + $maxSize;
+        $result += "$(long2ip($start))/$maxSize";
         $start += [int64][System.Math]::Pow(2, (32 - $maxSize));
     }
     return $result;
@@ -238,6 +238,27 @@ function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
 	return $result
 }
 
+# method getIpInfo
+# Return info about IPv4 network/address.
+# Usage:
+#     resolveASN("8.8.8.0/24");
+#     resolveASN("8.8.8.8");
+# Result:
+#     announced       : True
+#     as_country_code : US
+#     as_description  : GOOGLE - Google Inc.
+#     as_number       : 15169
+#     first_ip        : 8.8.8.0
+#     ip              : 8.8.8.8
+#     last_ip         : 8.8.8.255
+# @param $cidr string CIDR block or IPv4 Address
+# @return object with fields - announced,as_country_code,as_description,as_number,first_ip,ip,last_ip.
+function getIpInfo($cidr){
+	$apilink = "https://api.iptoasn.com/v1/as/ip/"
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	return ConvertFrom-Json($(Invoke-WebRequest $($apilink + $($cidr).Split("/")[0])).Content);
+}
+
 # method resolveASN.
 # Returns an ASN number from IPv4 network/address.
 # Usage:
@@ -247,9 +268,7 @@ function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
 # @param $cidr string CIDR block or IPv4 Address
 # @return ASN int.
 function resolveASN($cidr){
-    $apilink = "https://api.iptoasn.com/v1/as/ip/"
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    return $(ConvertFrom-Json($(Invoke-WebRequest $($apilink + $cidr)).Content)).as_number;
+	return $(getIpInfo($cidr)).as_number;
 }
 
 # method resolveCountry.
@@ -261,7 +280,40 @@ function resolveASN($cidr){
 # @param $cidr string CIDR block or IPv4 Address
 # @return US as string.
 function resolveCountry($cidr){
-    $apilink = "https://api.iptoasn.com/v1/as/ip/"
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    return $(ConvertFrom-Json($(Invoke-WebRequest $($apilink + $cidr)).Content)).as_country_code;
+	return $(getIpInfo($cidr)).as_country_code;
+}
+
+# method CIDRsummarize.
+# Returns an Summarised IPv4 network.
+# Usage:
+#     resolveASN(@("8.8.0.0/23","8.8.2.0/23","8.8.9.0/24","8.8.8.0/24"));
+# Result:
+#     "8.8.0.0/22"
+#     "8.8.8.0/23"
+# @param $cidr array of string of IPv4 CIDR block
+# @return array of string.
+function CIDRsummarize($cidrs){
+	[System.Collections.ArrayList]$cidrlist = $cidrs
+	$mask = 32
+	while ($mask -ge 1) {
+		$addr = $($cidrlist | where {$_ -like "*/$mask"})
+		[System.Collections.ArrayList]$addrl = @()
+        $addr | ForEach-Object {$(ip2long($_.split("/")[0])) -shr $(32-$mask)} | Sort-Object | ForEach-Object {$addrl.Add($_) >$null}
+		$pos = $addrl.count-1
+		while ($pos -ge 1){
+            if ($addrl[$pos] -eq $($addrl[$pos-1]+1)){
+                $ip1 = long2ip($addrl[$pos-1] -shl $(32-$mask))
+                $cidrlist.Remove("$ip1/$($mask)") >$null
+                $ip2 = long2ip($addrl[$pos] -shl $(32-$mask))
+                $cidrlist.Remove("$ip2/$($mask)") >$null
+                $str = long2ip($addrl[$pos-1] -shl $(32-$mask))
+                $cidrlist.Add("$str/$($mask-1)") >$null
+                $pos = $pos-2
+            } else {
+                $pos--
+            }
+		}
+		$mask--
+	}
+    return $cidrlist | Sort-Object
 }
