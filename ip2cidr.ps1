@@ -100,9 +100,10 @@ function maskToCIDR($netmask){
 # @access public
 # @static
 # @return String CIDR block.
-function alignedCIDR($ipinput,$netmask){
-    $alignedIP = ip2long((ip2long($ipinput)) -band (ip2long($netmask)));
-    return "$alignedIP/$(maskToCIDR($netmask))";
+function alignedCIDR($ipinput,$netmask)
+{
+	$alignedIP = ip2long((ip2long($ipinput)) -band (ip2long($netmask)));
+	return "$alignedIP/$(maskToCIDR($netmask))";
 }
 
 # method IPisWithinCIDR.
@@ -119,14 +120,15 @@ function alignedCIDR($ipinput,$netmask){
 # @access public
 # @static
 # @return String CIDR block.
-function IPisWithinCIDR($ipinput,$cidr){
-    $cidr = $cidr.Split("/");
-    $cidr = alignedCIDR -ipinput $cidr[0] -netmask $(CIDRtoMask([int]$cidr[1]));
-    $cidr = $cidr.Split("/");
-    $ipinput = (ip2long($ipinput));
-    $ip1 = (ip2long($cidr[0]));
-    $ip2 = ($ip1 + [System.Math]::Pow(2, (32 - [int]$cidr[1])) - 1);
-    return $(($ip1 -le $ipinput) -and ($ipinput -le $ip2));
+function IPisWithinCIDR($ipinput,$cidr)
+{
+	$cidr = $cidr.Split("/");
+	$cidr = alignedCIDR -ipinput $cidr[0] -netmask $(CIDRtoMask([int]$cidr[1]));
+	$cidr = $cidr.Split("/");
+	$ipinput = (ip2long($ipinput));
+	$ip1 = (ip2long($cidr[0]));
+	$ip2 = ($ip1 + [System.Math]::Pow(2, (32 - [int]$cidr[1])) - 1);
+	return $(($ip1 -le $ipinput) -and ($ipinput -le $ip2));
 }
 
 # method maxBlock.
@@ -142,10 +144,11 @@ function IPisWithinCIDR($ipinput,$cidr){
 # @access public
 # @static
 # @return int CIDR number.
-function maxBlock($ipinput) {
-    [int]$z = ip2long($ipinput);
-    $y = -($z -band -$z);
-    return maskToCIDR("$([System.BitConverter]::GetBytes($y)[3]).$([System.BitConverter]::GetBytes($y)[2]).$([System.BitConverter]::GetBytes($y)[1]).$([System.BitConverter]::GetBytes($y)[0])");
+function maxBlock($ipinput)
+{
+	[int]$z = ip2long($ipinput);
+	$y = -($z -band -$z);
+	return maskToCIDR("$([System.BitConverter]::GetBytes($y)[3]).$([System.BitConverter]::GetBytes($y)[2]).$([System.BitConverter]::GetBytes($y)[1]).$([System.BitConverter]::GetBytes($y)[0])");
 }
 
 # function rangeToCIDRList.
@@ -167,27 +170,17 @@ function maxBlock($ipinput) {
 # @return Array CIDR blocks in a numbered array.
 function rangeToCIDRList($ipStart, $ipEnd)
 {
-    $start = ip2long($ipStart)
-    $end = ip2long($ipEnd)
-    $result = @();
- 
-    while ($end -ge $start)
-    {
-        [byte]$maxSize = 32;
-        while ($maxSize -gt 0)
-        {
-            [int64]$mask = [System.Math]::Pow(2, 32) - [System.Math]::Pow(2, (32 - ($maxSize - 1)));
-            [int64]$maskBase = $start -band $mask;
- 
-            if ($maskBase -ne $start){break}
-            $maxSize--;
-        }
-        [byte]$maxDiff = [byte](32 - [System.Math]::Floor([System.Math]::Log($end - $start + 1) / [System.Math]::Log(2)));
-        if ($maxSize -lt $maxDiff){$maxSize = $maxDiff}
-        $result += "$(long2ip($start))/$maxSize";
-        $start += [int64][System.Math]::Pow(2, (32 - $maxSize));
-    }
-    return $result;
+	$listCIDRs = @()
+	$start = ip2long($startIP);
+	if ($endIP -eq $null) {$end = $start} else {$end = ip2long($endIP)};
+	while($end -ge $start) {
+		$maxsize = maxBlock(long2ip($start));
+        $maxdiff = 32 - [Math]::Truncate([System.Math]::Log($end - $start + 1)/[System.Math]::Log(2));
+		if ($maxsize -gt $maxdiff) {$size = $maxsize} else {$size = $maxdiff};
+		$listCIDRs += "$(long2ip($start))/$size";
+		$start += [System.Math]::Pow(2, (32 - $size));
+	}
+	return $listCIDRs;
 }
 
 # method cidrToRange.
@@ -201,18 +194,19 @@ function rangeToCIDRList($ipStart, $ipEnd)
 #     "127.0.0.255"
 # @param $cidr string CIDR block
 # @return Array low end of range then high end of range.
-function cidrToRange {
-    param
-    (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
-        [String]
-        $cidr
-    )
-    $range = @()
-    $cidra = $cidr.Split("/")
-    $range += long2ip((ip2long($cidra[0])) -band (-1 -shl (32 - $cidra[1])));
-    $range += long2ip((ip2long($cidra[0])) + [System.Math]::Pow(2, (32 - $cidra[1])) - 1);
-    return $range;
+function cidrToRange
+{
+	param
+	(
+	[Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
+	[String]
+	$cidr
+	)
+	$range = @()
+	$cidra = $cidr.Split("/")
+	$range += long2ip((ip2long($cidra[0])) -band (-1 -shl (32 - $cidra[1])));
+	$range += long2ip((ip2long($cidra[0])) + [System.Math]::Pow(2, (32 - $cidra[1])) - 1);
+	return $range;
 }
 
 # method cidrDevider.
@@ -225,7 +219,8 @@ function cidrToRange {
 # @param $cidr string CIDR block
 # @param $dstprefix int result prefix
 # @return Array of splited networks.
-function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
+function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix)
+{
 	$range = cidrToRange($cidr);
 	$result = @();
 	if ($dstprefix -lt $($cidr.Split("/")[1])){throw "Invalid Destination Prefix"};
@@ -253,7 +248,8 @@ function cidrDevider ($cidr, [ValidateRange(0,32)][int]$dstprefix) {
 #     last_ip         : 8.8.8.255
 # @param $cidr string CIDR block or IPv4 Address
 # @return object with fields - announced,as_country_code,as_description,as_number,first_ip,ip,last_ip.
-function getIpInfo($cidr){
+function getIpInfo($cidr)
+{
 	$apilink = "https://api.iptoasn.com/v1/as/ip/"
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	return ConvertFrom-Json($(Invoke-WebRequest $($apilink + $($cidr).Split("/")[0])).Content);
@@ -267,7 +263,8 @@ function getIpInfo($cidr){
 #     "15169"
 # @param $cidr string CIDR block or IPv4 Address
 # @return ASN int.
-function resolveASN($cidr){
+function resolveASN($cidr)
+{
 	return $(getIpInfo($cidr)).as_number;
 }
 
@@ -279,7 +276,8 @@ function resolveASN($cidr){
 #     "US"
 # @param $cidr string CIDR block or IPv4 Address
 # @return US as string.
-function resolveCountry($cidr){
+function resolveCountry($cidr)
+{
 	return $(getIpInfo($cidr)).as_country_code;
 }
 
@@ -292,28 +290,29 @@ function resolveCountry($cidr){
 #     "8.8.8.0/23"
 # @param $cidr array of string of IPv4 CIDR block
 # @return array of string.
-function CIDRsummarize($cidrs){
+function CIDRsummarize($cidrs)
+{
 	[System.Collections.ArrayList]$cidrlist = $cidrs
 	$mask = 32
 	while ($mask -ge 1) {
 		$addr = $($cidrlist | where {$_ -like "*/$mask"})
 		[System.Collections.ArrayList]$addrl = @()
-        $addr | ForEach-Object {$(ip2long($_.split("/")[0])) -shr $(32-$mask)} | Sort-Object | ForEach-Object {$addrl.Add($_) >$null}
+		$addr | ForEach-Object {$(ip2long($_.split("/")[0])) -shr $(32-$mask)} | Sort-Object | ForEach-Object {$addrl.Add($_) >$null}
 		$pos = $addrl.count-1
 		while ($pos -ge 1){
-            if ($addrl[$pos] -eq $($addrl[$pos-1]+1)){
-                $ip1 = long2ip($addrl[$pos-1] -shl $(32-$mask))
-                $cidrlist.Remove("$ip1/$($mask)") >$null
-                $ip2 = long2ip($addrl[$pos] -shl $(32-$mask))
-                $cidrlist.Remove("$ip2/$($mask)") >$null
-                $str = long2ip($addrl[$pos-1] -shl $(32-$mask))
-                $cidrlist.Add("$str/$($mask-1)") >$null
-                $pos = $pos-2
-            } else {
-                $pos--
-            }
+			if ($addrl[$pos] -eq $($addrl[$pos-1]+1)){
+				$ip1 = long2ip($addrl[$pos-1] -shl $(32-$mask))
+				$cidrlist.Remove("$ip1/$($mask)") >$null
+				$ip2 = long2ip($addrl[$pos] -shl $(32-$mask))
+				$cidrlist.Remove("$ip2/$($mask)") >$null
+				$str = long2ip($addrl[$pos-1] -shl $(32-$mask))
+				$cidrlist.Add("$str/$($mask-1)") >$null
+				$pos = $pos-2
+			} else {
+				$pos--
+			}
 		}
 		$mask--
 	}
-    return $cidrlist | Sort-Object
+	return $cidrlist | Sort-Object
 }
