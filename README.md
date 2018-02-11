@@ -80,8 +80,8 @@ see [Hamming Weight](http://stackoverflow.com/questions/109023/best-algorithm-to
 **Input parameter type:**<br/>
 ```[string] $ipinput IPv4 formatted ip address.```<br/>
 ```[string] $netmask IPv4 formatted ip address.```<br/>
-**Return parameter type:**
-```[string] CIDR block.```
+**Return parameter type:**<br/>
+```[string] CIDR block.```<br/>
 
 ### method IPisWithinCIDR.
 **Description**<br/>
